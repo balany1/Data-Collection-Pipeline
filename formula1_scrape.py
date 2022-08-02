@@ -14,7 +14,6 @@ class Scraper:
 
     """Scrapes driver, team and champions data from the given website.
 
-
     Args:
         URL(str): The URL of the F1 statistics website containing the data
         driver: The webdriver used to access the webpage
@@ -54,16 +53,16 @@ class Scraper:
 
         self.driver.get(self.URL) 
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Drivers').click()
-        self.get_driver_data()
+        self.__get_driver_data()
 
-    def get_image(self):
+    def __get_image(self):
 
         """Method that is called within get_driver_data that locates the element containing the drivers image and calls the function to download the image"""
 
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
-        self.download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/driver_images/", self.get_driver_name())
+        self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
     
-    def get_URL_list(self,element):
+    def __get_URL_list(self,element):
 
         """Scrapes URL for each driver
         
@@ -80,12 +79,13 @@ class Scraper:
 
         for pilot in starting_letter_tag: #collects all the drivers URLS in a list
 
-            link = pilot.find_element(By.TAG_NAME, 'a').get_attribute('href')
-            url_list.append(link)
+            link = pilot.find_element(By.TAG_NAME, 'a')
+            a_tag = link.get_attribute('href')
+            url_list.append(a_tag)
 
         return url_list
         
-    def download_image(self, url, file_path, file_name):
+    def __download_image(self, url, file_path, file_name):
 
         """Downloads the image located in get_image to the required location
         
@@ -98,7 +98,7 @@ class Scraper:
         full_path = file_path + file_name + '.jpg'
         urllib.request.urlretrieve(url, full_path)
 
-    def stripF1_text(self, tobereplaced):
+    def __stripF1_text(self, tobereplaced):
 
         """Reformats the Name of the Driver/Team without any unneccessary text
         
@@ -111,13 +111,13 @@ class Scraper:
         Name = self.driver.find_element(by=By.XPATH, value="//h1[@class='page-title']").text.replace(tobereplaced, "")
         return Name
     
-    def get_driver_name(self) -> str: 
+    def __get_driver_name(self) -> str: 
 
         """Splits Driver Name string into Forename and Surname and store as variables to be able to add to driver dictionary/use for filename for image
         
         """
         
-        Name = self.stripF1_text("Formula 1 Driver")
+        Name = self.__stripF1_text("Formula 1 Driver")
         driver_forename = Name.split()[0]
         driver_surname = " ".join(Name.split()[1:len(Name.split())-3])
 
@@ -125,17 +125,17 @@ class Scraper:
         self.dict_entry["Driver Second Name"] = driver_surname
         return driver_forename + "_" + driver_surname
 
-    def get_driver_data(self):
+    def __get_driver_data(self):
 
         """Scrapes data for each driver and stores in a dictionary with a unique reference 
         
         """
         
         #creates directory for driver data
-        self.create_dir("driver_data")
+        self.__create_dir("driver_data")
 
         #find element containing individual driver URLS
-        url_list = self.get_URL_list("//div[@class='col-sm-6 col-md-4']")
+        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
 
         
         for link in url_list: #loops through every URL in the list and scrapes the statistics
@@ -146,8 +146,8 @@ class Scraper:
             #opens each URL in the list
             self.driver.get(link)
 
-            self.get_driver_name() #gets the Drivers Name and splits it into First name, Surname
-            self.get_image()
+            self.__get_driver_name() #gets the Drivers Name and splits it into First name, Surname
+            self.__get_image()
 
             #scrapes the data from the different columns
             column1_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-6']//td")
@@ -161,7 +161,7 @@ class Scraper:
             self.driver_dict[uuid.uuid4().hex] = self.dict_entry
 
         #dump to json file
-        self.dumptojson(self.driver_dict, "driver_data.json")
+        self.__dumptojson(self.driver_dict, "driver_data.json")
 
     def navigate_teams(self):
 
@@ -169,28 +169,28 @@ class Scraper:
 
         self.driver.get(self.URL)
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Teams').click()
-        self.get_team_data()
+        self.__get_team_data()
 
-    def get_team_name(self):
+    def __get_team_name(self):
 
         """Reformats the Name of the Team without any unneccessary text
         
         """
         
-        Team_Name = self.stripF1_text("Formula 1")
+        Team_Name = self.__stripF1_text("Formula 1")
         self.dict_entry["Team Name"] = Team_Name
         
-    def get_team_data(self):
+    def __get_team_data(self):
 
         """Scrapes data for each driver and stores in a dictionary with a unique reference 
         
         """
         
         #creates directory for team data
-        self.create_dir("team_data")
+        self.__create_dir("team_data")
 
         #find element containing individual driver URLS
-        url_list = self.get_URL_list("//div[@class='col-sm-6 col-md-4']")
+        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
             
         #loops through every URL in the list and scrapes the statistics
         for link in url_list[:5]: 
@@ -202,7 +202,7 @@ class Scraper:
             self.driver.get(link)
 
             #gets the Drivers Name and strips the "Formula 1" from it
-            self.get_team_name() 
+            self.__get_team_name() 
 
             #scrape the data from the different tables on each page
             team_history_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//tbody[@itemtype='http://schema.org/SportsTeam']//td")
@@ -221,7 +221,7 @@ class Scraper:
             self.teams_dict[uuid.uuid4().hex] = self.dict_entry
 
         #dump to json file
-        self.dumptojson(self.teams_dict, "teams_data.json")
+        self.__dumptojson(self.teams_dict, "teams_data.json")
 
     def navigate_champs(self):
 
@@ -229,16 +229,16 @@ class Scraper:
 
         self.driver.get(self.URL)
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Champions').click()
-        self.get_champs_data()
+        self.__get_champs_data()
 
-    def get_champs_data(self):
+    def __get_champs_data(self):
 
         """Scrapes data for each championship year and stores in a dictionary with the year as a unique reference 
         
         """
 
         #creates directory for driver data
-        self.create_dir("champs_data")
+        self.__create_dir("champs_data")
 
         #find elements that contain champion info
         champs_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//td")
@@ -253,9 +253,9 @@ class Scraper:
                 self.champs_dict[uuid.uuid4().hex] = self.dict_entry
                 
         #dump to json file
-        self.dumptojson(self.champs_dict, "champs_data.json")
+        self.__dumptojson(self.champs_dict, "champs_data.json")
 
-    def create_dir(self,directory):
+    def __create_dir(self,directory):
         
         """Checks if the path/folder to be created already exists and if not, creates the directory
 
@@ -268,7 +268,7 @@ class Scraper:
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
 
-    def dumptojson(self, dictionary, out_file):
+    def __dumptojson(self, dictionary, out_file):
 
         """Dumps the collected information into a named file.json
 

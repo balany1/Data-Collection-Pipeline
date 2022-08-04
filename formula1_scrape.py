@@ -4,11 +4,13 @@ import os
 import json
 import urllib.request
 import urllib
+import argparse
 from selenium.webdriver.common.by import By
 from cgitb import text
 from numpy import append
 from requests import request
 from selenium import webdriver
+from traitlets import Bool
 
 class Scraper:
 
@@ -25,9 +27,13 @@ class Scraper:
     """
 
     def __init__(self, URL : str, driver : webdriver.Chrome, parent_dir:str):
-        
+
+        self.parser = argparse.ArgumentParser(description='Decide what statistics to scrape')
+        self.parser.add_argument('-d','--drivers', default=False, action='store_true', help='Scrape Drivers:True/False')
+        self.parser.add_argument('-t', '--teams', default=False, action='store_true', help='Scrape Teams:True/False')
+        self.parser.add_argument('-c', '--championships', default=False, action='store_true', help='Scrape Championships:True/False')
+        self.args = self.parser.parse_args()
         self.driver = driver
-        self.team_list = []
         self.URL = URL
         self.driver_dict={}
         self.teams_dict = {}
@@ -37,9 +43,10 @@ class Scraper:
         path = os.path.join(parent_dir, directory)
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
+        self.__load_and_accept_cookies()
         
 
-    def load_and_accept_cookies(self) -> None:
+    def __load_and_accept_cookies(self) -> None:
 
         """Opens the site and accepts cookies"""
         
@@ -77,7 +84,11 @@ class Scraper:
         
         starting_letter_tag = self.driver.find_elements(by=By.XPATH, value=element)
 
-        for pilot in starting_letter_tag: #collects all the drivers URLS in a list
+        no_of_pages = int(input('Please select how many drivers/teams/championship years you wish to collect data for(for all data, please select 0:'))
+        if no_of_pages == 0:
+            no_of_pages = len(starting_letter_tag)
+
+        for pilot in starting_letter_tag[:no_of_pages]: #collects all the drivers URLS in a list
 
             link = pilot.find_element(By.TAG_NAME, 'a')
             a_tag = link.get_attribute('href')
@@ -137,7 +148,6 @@ class Scraper:
         #find element containing individual driver URLS
         url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
 
-        
         for link in url_list: #loops through every URL in the list and scrapes the statistics
             
             #resets the dictionary entry to blank at the beginning of each URL
@@ -193,7 +203,7 @@ class Scraper:
         url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
             
         #loops through every URL in the list and scrapes the statistics
-        for link in url_list[:5]: 
+        for link in url_list: 
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
@@ -236,15 +246,18 @@ class Scraper:
         """Scrapes data for each championship year and stores in a dictionary with the year as a unique reference 
         
         """
-
         #creates directory for driver data
         self.__create_dir("champs_data")
 
         #find elements that contain champion info
         champs_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//td")
 
+        no_of_pages = input('Please select how many championship years you wish to collect data for(for all years, please select 0:')
+        if no_of_pages == 0:
+            no_of_pages = len(champs_data)
+
         #loop through elements to separate into data by year
-        for i in range(0,len(champs_data),4):
+        for i in range(0,int(no_of_pages),4):
                 self.dict_entry={}
                 self.dict_entry["Year"] = champs_data[i].text
                 self.dict_entry["Driver"] = champs_data[i+1].text
@@ -283,8 +296,10 @@ class Scraper:
 
 if __name__ == "__main__":
     scraper = Scraper("https://www.4mula1stats.com/", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
-    scraper.load_and_accept_cookies()
-    scraper.navigate_drivers()
-    scraper.navigate_teams()
-    scraper.navigate_champs()
+    if scraper.args.drivers:
+        scraper.navigate_drivers()
+    if scraper.args.teams:
+        scraper.navigate_teams()
+    if scraper.args.championships:
+        scraper.navigate_champs()
 

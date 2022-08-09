@@ -1,4 +1,5 @@
 import time
+from tracemalloc import start
 import uuid
 import os
 import json
@@ -60,7 +61,7 @@ class Scraper:
 
         self.driver.get(self.URL) 
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Drivers').click()
-        self.__get_driver_data()
+
 
     def __get_image(self):
 
@@ -69,7 +70,22 @@ class Scraper:
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
         self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
     
-    def __get_URL_list(self,element):
+    def __get_no_of_pages(self,default_len,title):
+
+        """Scrapes URL for each driver
+        
+        Args:
+            default_len:   The length of the full_list of drivers if required
+            
+        Returns:
+            no_of_pages: The number of pages requested by the user   
+        """
+        no_of_pages = int(input(f'Please select how many {title} you wish to collect data for(for all data, please select 0:'))
+        if no_of_pages == 0:
+            no_of_pages = default_len
+        return no_of_pages
+
+    def __get_URL_list(self,element,title):
 
         """Scrapes URL for each driver
         
@@ -79,14 +95,13 @@ class Scraper:
         Returns:
             url_list(list): List of URLS for each driver that can then be looped through to scrape data    
         """
-
+        title = title
         url_list = []
         
         starting_letter_tag = self.driver.find_elements(by=By.XPATH, value=element)
+        default_len = len(starting_letter_tag)
 
-        no_of_pages = int(input('Please select how many drivers/teams/championship years you wish to collect data for(for all data, please select 0:'))
-        if no_of_pages == 0:
-            no_of_pages = len(starting_letter_tag)
+        no_of_pages = self.__get_no_of_pages(default_len, title)
 
         for pilot in starting_letter_tag[:no_of_pages]: #collects all the drivers URLS in a list
 
@@ -136,17 +151,18 @@ class Scraper:
         self.dict_entry["Driver Second Name"] = driver_surname
         return driver_forename + "_" + driver_surname
 
-    def __get_driver_data(self):
+    def get_driver_data(self):
 
         """Scrapes data for each driver and stores in a dictionary with a unique reference 
         
         """
         
+
         #creates directory for driver data
         self.__create_dir("driver_data")
 
         #find element containing individual driver URLS
-        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
+        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']","drivers")
 
         for link in url_list: #loops through every URL in the list and scrapes the statistics
             
@@ -159,7 +175,7 @@ class Scraper:
             self.__get_driver_name() #gets the Drivers Name and splits it into First name, Surname
             self.__get_image()
 
-            #scrapes the data from the different columns
+            #scrapes the data from the different columns, use try except here
             column1_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-6']//td")
             for i in range(0,len(column1_data),2):
                     self.dict_entry[column1_data[i].text] = column1_data[i+1].text
@@ -179,7 +195,6 @@ class Scraper:
 
         self.driver.get(self.URL)
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Teams').click()
-        self.__get_team_data()
 
     def __get_team_name(self):
 
@@ -190,17 +205,17 @@ class Scraper:
         Team_Name = self.__stripF1_text("Formula 1")
         self.dict_entry["Team Name"] = Team_Name
         
-    def __get_team_data(self):
+    def get_team_data(self):
 
         """Scrapes data for each driver and stores in a dictionary with a unique reference 
         
         """
-        
+
         #creates directory for team data
         self.__create_dir("team_data")
 
         #find element containing individual driver URLS
-        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']")
+        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']", "teams")
             
         #loops through every URL in the list and scrapes the statistics
         for link in url_list: 
@@ -239,22 +254,22 @@ class Scraper:
 
         self.driver.get(self.URL)
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Champions').click()
-        self.__get_champs_data()
+        
 
-    def __get_champs_data(self):
+    def get_champs_data(self):
+
 
         """Scrapes data for each championship year and stores in a dictionary with the year as a unique reference 
         
         """
+
         #creates directory for driver data
         self.__create_dir("champs_data")
 
         #find elements that contain champion info
         champs_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//td")
 
-        no_of_pages = input('Please select how many championship years you wish to collect data for(for all years, please select 0:')
-        if no_of_pages == 0:
-            no_of_pages = len(champs_data)
+        no_of_pages = self.__get_no_of_pages(len(champs_data), "championship years")
 
         #loop through elements to separate into data by year
         for i in range(0,int(no_of_pages),4):
@@ -293,13 +308,17 @@ class Scraper:
         """
         out_file = open(out_file, "w")
         json.dump(dictionary, out_file, indent = 6)
+        out_file.close()
 
 if __name__ == "__main__":
     scraper = Scraper("https://www.4mula1stats.com/", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
     if scraper.args.drivers:
         scraper.navigate_drivers()
+        scraper.get_driver_data()
     if scraper.args.teams:
         scraper.navigate_teams()
+        scraper.get_team_data()
     if scraper.args.championships:
         scraper.navigate_champs()
+        scraper.get_champs_data()
 

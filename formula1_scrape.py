@@ -27,7 +27,7 @@ class Scraper:
 
     """
 
-    def __init__(self, URL : str, driver : webdriver.Chrome, parent_dir:str):
+    def __init__(self, URL : str, driver : webdriver.Chrome, parent_dir : str):
 
         self.parser = argparse.ArgumentParser(description='Decide what statistics to scrape')
         self.parser.add_argument('-d','--drivers', default=False, action='store_true', help='Scrape Drivers:True/False')
@@ -46,7 +46,6 @@ class Scraper:
             raw_data = os.mkdir(path)
         self.__load_and_accept_cookies()
         
-
     def __load_and_accept_cookies(self) -> None:
 
         """Opens the site and accepts cookies"""
@@ -62,7 +61,6 @@ class Scraper:
         self.driver.get(self.URL) 
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Drivers').click()
 
-
     def __get_image(self):
 
         """Method that is called within get_driver_data that locates the element containing the drivers image and calls the function to download the image"""
@@ -70,7 +68,7 @@ class Scraper:
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
         self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
     
-    def __get_no_of_pages(self,default_len,title):
+    def get_no_of_pages(self,default_len,title):
 
         """Scrapes URL for each driver
         
@@ -101,7 +99,7 @@ class Scraper:
         starting_letter_tag = self.driver.find_elements(by=By.XPATH, value=element)
         default_len = len(starting_letter_tag)
 
-        no_of_pages = self.__get_no_of_pages(default_len, title)
+        no_of_pages = self.get_no_of_pages(default_len, title)
 
         for pilot in starting_letter_tag[:no_of_pages]: #collects all the drivers URLS in a list
 
@@ -157,7 +155,6 @@ class Scraper:
         
         """
         
-
         #creates directory for driver data
         self.__create_dir("driver_data")
 
@@ -269,7 +266,7 @@ class Scraper:
         #find elements that contain champion info
         champs_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//td")
 
-        no_of_pages = self.__get_no_of_pages(len(champs_data), "championship years")
+        no_of_pages = self.get_no_of_pages(len(champs_data), "championship years")
 
         #loop through elements to separate into data by year
         for i in range(0,int(no_of_pages),4):

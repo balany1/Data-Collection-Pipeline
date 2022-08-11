@@ -36,9 +36,9 @@ class Scraper:
         self.args = self.parser.parse_args()
         self.driver = driver
         self.URL = URL
-        self.driver_dict={}
-        self.teams_dict = {}
-        self.champs_dict = {}
+        self.driver_list=[]
+        self.teams_list= []
+        self.champs_list = []
         self.dict_entry = {}
         directory = "raw_data"
         path = os.path.join(parent_dir, directory)
@@ -165,7 +165,7 @@ class Scraper:
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
-
+            self.dict_entry["ID"] = uuid.uuid4().hex
             #opens each URL in the list
             self.driver.get(link)
 
@@ -181,10 +181,10 @@ class Scraper:
                     self.dict_entry[column23_data[i].text] = column23_data[i+1].text
 
             #add each entry as a nested dictionary
-            self.driver_dict[uuid.uuid4().hex] = self.dict_entry
+            self.driver_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.driver_dict, "driver_data.json")
+        self.__dumptojson(self.driver_list, "driver_data.json")
 
     def navigate_teams(self):
 
@@ -219,6 +219,7 @@ class Scraper:
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
+            self.dict_entry["ID"] = uuid.uuid4().hex
 
             #opens each page in the list of URLs
             self.driver.get(link)
@@ -240,10 +241,10 @@ class Scraper:
                 self.dict_entry[team_data[i].text] = team_data[i+1].text
             
             #add each entry as a nested dictionary
-            self.teams_dict[uuid.uuid4().hex] = self.dict_entry
+            self.teams_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.teams_dict, "teams_data.json")
+        self.__dumptojson(self.teams_list, "teams_data.json")
 
     def navigate_champs(self):
 
@@ -271,14 +272,15 @@ class Scraper:
         #loop through elements to separate into data by year
         for i in range(0,int(no_of_pages),4):
                 self.dict_entry={}
+                self.dict_entry["ID"] = uuid.uuid4().hex
                 self.dict_entry["Year"] = champs_data[i].text
                 self.dict_entry["Driver"] = champs_data[i+1].text
                 self.dict_entry["Driver's Team"] = champs_data[i+2].text
                 self.dict_entry["Winning Team"] = champs_data[i+3].text
-                self.champs_dict[uuid.uuid4().hex] = self.dict_entry
+                self.champs_list.append(self.dict_entry)
                 
         #dump to json file
-        self.__dumptojson(self.champs_dict, "champs_data.json")
+        self.__dumptojson(self.champs_list, "champs_data.json")
 
     def __create_dir(self,directory):
         

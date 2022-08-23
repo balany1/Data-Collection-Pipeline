@@ -83,6 +83,17 @@ class Scraper:
             no_of_pages = default_len
         return no_of_pages
 
+    def __find_elements(self, element : str):
+
+        column_data = self.driver.find_elements(by=By.XPATH, value= element)
+        for i in range(0,len(column_data),2):
+                    entry = self.__edit_multiple_occurrences(column_data[i+1].text)
+                    if entry.isdigit():
+                        entry = int(entry)
+                    else:
+                        entry = entry
+                    self.dict_entry[column_data[i].text] = entry
+
     def __get_URL_list(self,element,title):
 
         """Scrapes URL for each driver
@@ -135,6 +146,12 @@ class Scraper:
         Name = self.driver.find_element(by=By.XPATH, value="//h1[@class='page-title']").text.replace(tobereplaced, "")
         return Name
     
+    def __edit_multiple_occurrences(self, entry):
+        location_of_X = entry.find("X")
+        if location_of_X != -1:
+            return entry.replace(entry[(location_of_X)-1:len(entry)],"")
+        else:
+            return entry
     def __get_driver_name(self) -> str: 
 
         """Splits Driver Name string into Forename and Surname and store as variables to be able to add to driver dictionary/use for filename for image
@@ -173,14 +190,10 @@ class Scraper:
             self.__get_image()
 
             #scrapes the data from the different columns, use try except here
-            column1_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-6']//td")
-            for i in range(0,len(column1_data),2):
-                    self.dict_entry[column1_data[i].text] = column1_data[i+1].text
-            column23_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-3']//td")
-            for i in range(0,len(column23_data),2):
-                    self.dict_entry[column23_data[i].text] = column23_data[i+1].text
+            column1_data = self.__find_elements("//div[@class='col-md-6']//td")
+            column23_data = self.__find_elements("//div[@class='col-md-3']//td")
 
-            #add each entry as a nested dictionary
+            #add each entry as a nested list
             self.driver_list.append(self.dict_entry)
 
         #dump to json file
@@ -228,17 +241,10 @@ class Scraper:
             self.__get_team_name() 
 
             #scrape the data from the different tables on each page
-            team_history_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//tbody[@itemtype='http://schema.org/SportsTeam']//td")
-            for i in range(0,len(team_history_data),2):
-                self.dict_entry[team_history_data[i].text] = team_history_data[i+1].text
-
-            team_driver_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-6']//td")
-            for i in range(0,len(team_driver_data),2):
-                self.dict_entry[team_driver_data[i].text] = team_driver_data[i+1].text
-
-            team_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='col-md-5']//td")
-            for i in range(0,len(team_data),2):
-                self.dict_entry[team_data[i].text] = team_data[i+1].text
+            team_history_data = self.__find_elements("//div[@class='table-responsive']//tbody[@itemtype='http://schema.org/SportsTeam']//td")
+            team_driver_data = self.__find_elements("//div[@class='col-md-6']//td")
+            team_data = self.__find_elements("//div[@class='col-md-5']//td")
+            
             
             #add each entry as a nested dictionary
             self.teams_list.append(self.dict_entry)

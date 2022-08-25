@@ -6,6 +6,7 @@ import json
 import urllib.request
 import urllib
 import argparse
+import boto3 
 from selenium.webdriver.common.by import By
 from cgitb import text
 from numpy import append
@@ -13,6 +14,8 @@ from requests import request
 from selenium import webdriver
 from traitlets import Bool
 
+
+client = boto3.client('s3')
 class Scraper:
 
     """Scrapes driver, team and champions data from the given website.
@@ -68,9 +71,9 @@ class Scraper:
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
         self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
     
-    def get_no_of_pages(self,default_len,title):
+    def get_no_of_pages(self,default_len : int ,title : str):
 
-        """Scrapes URL for each driver
+        """Scrapes URL for each driver/team/championship year
         
         Args:
             default_len:   The length of the full_list of drivers if required
@@ -78,8 +81,19 @@ class Scraper:
         Returns:
             no_of_pages: The number of pages requested by the user   
         """
-        no_of_pages = int(input(f'Please select how many {title} you wish to collect data for(for all data, please select 0:'))
+        valid = False
+        while not valid:  
+            no_of_pages = input(f'Please select how many {title} you wish to collect data for(for all data, please select 0:') 
+            try:
+                no_of_pages = int(no_of_pages)
+                valid = True
+            except ValueError:
+                print('Please enter an integer value')
+                continue
+
         if no_of_pages == 0:
+            no_of_pages = default_len
+        elif no_of_pages > default_len:
             no_of_pages = default_len
         return no_of_pages
 
@@ -94,7 +108,7 @@ class Scraper:
                         entry = entry
                     self.dict_entry[column_data[i].text] = entry
 
-    def __get_URL_list(self,element,title):
+    def __get_URL_list(self,element : str ,title : str):
 
         """Scrapes URL for each driver
         
@@ -120,7 +134,7 @@ class Scraper:
 
         return url_list
         
-    def __download_image(self, url, file_path, file_name):
+    def __download_image(self : str, url : str, file_path : str, file_name : str):
 
         """Downloads the image located in get_image to the required location
         
@@ -133,7 +147,7 @@ class Scraper:
         full_path = file_path + file_name + '.jpg'
         urllib.request.urlretrieve(url, full_path)
 
-    def __stripF1_text(self, tobereplaced):
+    def __stripF1_text(self, tobereplaced : str):
 
         """Reformats the Name of the Driver/Team without any unneccessary text
         
@@ -146,12 +160,13 @@ class Scraper:
         Name = self.driver.find_element(by=By.XPATH, value="//h1[@class='page-title']").text.replace(tobereplaced, "")
         return Name
     
-    def __edit_multiple_occurrences(self, entry):
+    def __edit_multiple_occurrences(self, entry: str):
         location_of_X = entry.find("X")
         if location_of_X != -1:
             return entry.replace(entry[(location_of_X)-1:len(entry)],"")
         else:
             return entry
+
     def __get_driver_name(self) -> str: 
 
         """Splits Driver Name string into Forename and Surname and store as variables to be able to add to driver dictionary/use for filename for image
@@ -177,12 +192,15 @@ class Scraper:
 
         #find element containing individual driver URLS
         url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']","drivers")
+        driver_count = 0
 
         for link in url_list: #loops through every URL in the list and scrapes the statistics
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
             self.dict_entry["ID"] = uuid.uuid4().hex
+            driver_count = driver_count + 1
+            self.dict_entry["Driver number"] = driver_count
             #opens each URL in the list
             self.driver.get(link)
 
@@ -226,6 +244,8 @@ class Scraper:
 
         #find element containing individual driver URLS
         url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']", "teams")
+
+        team_count = 0
             
         #loops through every URL in the list and scrapes the statistics
         for link in url_list: 
@@ -233,6 +253,8 @@ class Scraper:
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
             self.dict_entry["ID"] = uuid.uuid4().hex
+            team_count = team_count + 1
+            self.dict_entry["Driver number"] = team_count
 
             #opens each page in the list of URLs
             self.driver.get(link)
@@ -259,7 +281,6 @@ class Scraper:
         self.driver.get(self.URL)
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']").find_element(by=By.LINK_TEXT, value = 'Champions').click()
         
-
     def get_champs_data(self):
 
 
@@ -273,13 +294,14 @@ class Scraper:
         #find elements that contain champion info
         champs_data = self.driver.find_elements(by=By.XPATH, value="//div[@class='table-responsive']//td")
 
-        no_of_pages = self.get_no_of_pages(len(champs_data), "championship years")
+        no_of_pages = self.get_no_of_pages(len(champs_data)//4, "championship years")
 
         #loop through elements to separate into data by year
-        for i in range(0,int(no_of_pages),4):
+        for i in range(0,int(no_of_pages)*4,4):
                 self.dict_entry={}
                 self.dict_entry["ID"] = uuid.uuid4().hex
-                self.dict_entry["Year"] = champs_data[i].text
+                self.dict_entry["Year number"] = i//4 + 1
+                self.dict_entry["Year"] = int(champs_data[i].text)
                 self.dict_entry["Driver"] = champs_data[i+1].text
                 self.dict_entry["Driver's Team"] = champs_data[i+2].text
                 self.dict_entry["Winning Team"] = champs_data[i+3].text
@@ -288,7 +310,7 @@ class Scraper:
         #dump to json file
         self.__dumptojson(self.champs_list, "champs_data.json")
 
-    def __create_dir(self,directory):
+    def __create_dir(self,directory : str):
         
         """Checks if the path/folder to be created already exists and if not, creates the directory
 
@@ -301,7 +323,7 @@ class Scraper:
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
 
-    def __dumptojson(self, dictionary, out_file):
+    def __dumptojson(self, dictionary : str, out_file : str):
 
         """Dumps the collected information into a named file.json
 

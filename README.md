@@ -98,3 +98,93 @@ And called it within the get_driver_data method
             img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']")
             img = img_src.get_attribute('src')
             self.download_image(img, "/home/andrew/AICore_work/Data-Collection-Pipeline/driver_images/", self.get_driver_name())
+
+Milestone 5: 
+
+During this milestone, I have undergone an extensive refactoring of my code with a focus on ensuring that every method does one thing and this has resulted in my code containing many more methods than it had previously. For instance, previously I had this code to collect URLs in each of the get_driver_data, get_team_data and get_champs_data 
+
+#collects all the drivers URLS in a list
+           for team in starting_letter_tag: 
+    
+               a_tag = team.find_element(By.TAG_NAME, 'a')
+               link = a_tag.get_attribute('href')
+               self.team_list.append(link)
+               
+           #loops through every URL in the list and scrapes the statistics
+           for link in self.team_list:
+               
+               #resets the dictionary entry to blank at the beginning of each URL
+               self.dict_entry={}
+
+               #opens each page in the list of URLs
+
+I created a method for lines 107 to 111 on its own that is called within each of the three previous methods mentioned. This has simplified my code and doing this has furthered my understanding of using arguments
+
+        url_list = self.__get_URL_list("//div[@class='col-sm-6 col-md-4']","drivers")
+
+The arguments in the above line of code represent the div container containing the required URLS to be collected and the "drivers" references which method that the get_URL-list has been called from. This understanding has made my code more robust as to be used in other applications with as little change as possible.
+
+In addition to this, I refactored the code to include argument parsing to give the user choice over how much data and what type of data to scrape. It also included error handling to enforce an integer input. An example of this is:
+
+	self.parser = argparse.ArgumentParser(description='Decide what statistics to scrape')
+        self.parser.add_argument('-d','--drivers', default=False, action='store_true', 			 help='Scrape Drivers:True/False')
+
+I have learned the protocol and etiquette for adding docstrings to my code to enable tthe user to understand the code more effectively. An example of this is:
+
+def __stripF1_text(self, tobereplaced : str):
+
+        """Reformats the Name of the Driver/Team without any unneccessary text
+        
+        Args:
+            toberreplaced(str):   Unnecessary text to be reformatted
+            
+        Returns:
+            Name(str): Name in required format
+        """
+        
+At this point in my code I have also learned about function type expressions and have added types to all of my methods.
+
+Unit testing was the next thing to add to my code. Firstly, this required me to make some of my methods private as they were called within other methods and by testing the public methods i was implicitly testing the private methods as well. This required some refactoring of my code: def navigate_driver() had previously called def get_driver_data. I had to change the if __name__ = '__main__' to separate these two methods so that I could test them separately. 
+
+I tested my navigation methods with the following code:
+
+def test_scrapenavigate_driver(self):
+        self.scraper.navigate_drivers()
+        response = requests.get(self.scraper.driver.current_url)
+        self.assertEqual(response.url, "https://www.4mula1stats.com/driver")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.status_code, 400)
+        
+which only needed to check that the correct URL was reached and that the URL was reached correctly with no error codes. The get_*_data methods required more testing. For these I needed the mock library and had to patch in a user input
+
+@patch('builtins.input', return_value = 7)
+    def test_scrape_driver(self,
+        mock_input
+        ):
+
+        #asserts dictionary length matches input
+        self.scraper.navigate_drivers()
+        self.scraper.get_driver_data()
+        dict_len = len(self.scraper.driver_list)
+        self.assertEqual(dict_len, mock_input.return_value)
+
+        #checks mock input has been called
+        mock_input.assert_called_once()
+
+        #asserts output type is a list
+        output_type = type(self.scraper.driver_list)
+        assert output_type is list
+        
+        #checks certain entrys to see if they are as expected
+        f = open('driver_data.json')
+        drivers_dictionary = json.load(f)
+        driver_atrributes_list  = list(drivers_dictionary[0].values())
+        driver_first_name = driver_atrributes_list[1]
+        self.assertEqual(driver_first_name,"Adolf")
+        assert type(driver_first_name) is str
+        f.close()
+
+
+This checked the length of dictionary produced was correct and that the type of output was in fact a dictionary. The unit test further checked that the types of the key pairs were as they should be. These tests were applied to both the teams and champions data as such testing all the public methods.
+
+

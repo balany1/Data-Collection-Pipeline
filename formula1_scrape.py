@@ -1,3 +1,4 @@
+from lib2to3.pgen2.pgen import DFAState
 import time
 from tracemalloc import start
 import uuid
@@ -7,6 +8,10 @@ import urllib.request
 import urllib
 import argparse
 import boto3 
+import psycopg2
+import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy import inspect
 from selenium.webdriver.common.by import By
 from cgitb import text
 from numpy import append
@@ -15,7 +20,6 @@ from selenium import webdriver
 from traitlets import Bool
 
 
-client = boto3.client('s3')
 class Scraper:
 
     """Scrapes driver, team and champions data from the given website.
@@ -36,18 +40,23 @@ class Scraper:
         self.parser.add_argument('-d','--drivers', default=False, action='store_true', help='Scrape Drivers:True/False')
         self.parser.add_argument('-t', '--teams', default=False, action='store_true', help='Scrape Teams:True/False')
         self.parser.add_argument('-c', '--championships', default=False, action='store_true', help='Scrape Championships:True/False')
+        self.parser.add_argument('-l', '--circuits', default=False, action='store_true', help='Scrape Circuits:True/False')
         self.args = self.parser.parse_args()
         self.driver = driver
         self.URL = URL
         self.driver_list=[]
         self.teams_list= []
         self.champs_list = []
+        self.circuit_list = []
         self.dict_entry = {}
         directory = "raw_data"
         path = os.path.join(parent_dir, directory)
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
-        self.__load_and_accept_cookies()
+        try:
+            self.__load_and_accept_cookies()
+        except webdriver.NoSuchElementException:
+            pass
         
     def __load_and_accept_cookies(self) -> None:
 
@@ -274,6 +283,8 @@ class Scraper:
         #dump to json file
         self.__dumptojson(self.teams_list, "teams_data.json")
 
+        self.clean_data('Team')
+
     def navigate_champs(self):
 
         """Navigates to the list of F1 champions and calls the get_champs_data method to begin scraping the data for each championship year"""
@@ -310,6 +321,38 @@ class Scraper:
         #dump to json file
         self.__dumptojson(self.champs_list, "champs_data.json")
 
+        self.clean_data('Champs')
+
+    def navigate_circuits(self):
+        self.driver.get(self.URL)
+        self.driver.maximize_window()
+        navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='row-2']").find_element(by=By.LINK_TEXT, value = "Circuits").click()
+
+    def get_circuit_data(self):
+        self.__create_dir("circuit_data")
+
+        info_table = self.driver.find_elements(by=By.XPATH, value="//table[@class='sortable']//tbody//tr//td")
+        
+
+        no_of_pages = self.get_no_of_pages(len(info_table)//5, "circuits")
+        print(no_of_pages)
+
+        for i in range(0,int(no_of_pages)*5,6):
+                self.dict_entry={}
+                self.dict_entry["ID"] = uuid.uuid4().hex
+                self.dict_entry["Track Number"] = i//5 + 1
+                self.dict_entry["Circuit Location"] = info_table[i].text
+                self.dict_entry["Circuit Name"] = info_table[i+1].text
+                self.dict_entry["Country"] = info_table[i+3].text
+                self.dict_entry["Debut Year"] = info_table[i+4].text
+                self.dict_entry["No.of times held"] = info_table[i+5].text
+                self.circuit_list.append(self.dict_entry)
+
+        #dump to json file
+        self.__dumptojson(self.circuit_list, "circuit_data.json")
+
+        self.clean_data('Circuit')
+
     def __create_dir(self,directory : str):
         
         """Checks if the path/folder to be created already exists and if not, creates the directory
@@ -337,15 +380,175 @@ class Scraper:
         json.dump(dictionary, out_file, indent = 6)
         out_file.close()
 
+    def uploadtos3(self, file):
+        BUCKET_NAME= "formula1-aicore"
+
+        s3 = boto3.client("s3")
+
+        def uploadDirectory(path,bucketname):
+                for root,dirs,files in os.walk(path):
+                    for file in files:
+                        s3.upload_file(os.path.join(root,file),bucketname,file)
+
+        uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/back_up",BUCKET_NAME)
+        
+    def clean_data(self, data_type):
+
+        if data_type == 'Driver':
+            f = open('driver_data.json')
+            data = json.load(f)
+            df = pd.DataFrame(data)
+
+            #fix other data types
+            df["First Race"] = df["First Race"].astype(str)
+            #Consistency for Nationalities
+            df["Nationality"] = df["Nationality"].str.title()
+
+            #Separate circuits and years for first race and last race
+
+            first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
+            last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+
+            df["Debut Year"] = first_race_data[1]
+            df["Debut Circuit"] = first_race_data[0]
+            df["Debut Circuit"] = df["Debut Circuit"].astype(str)
+            df["Final Year"] = last_race_data[1]
+            df["Final Circuit"] = last_race_data[0]
+            df["Final Circuit"] = df["Final Circuit"].astype(str)
+
+
+            #Separate best position and year
+            df["Best championship position"] = df["Best championship position"].astype(str)
+            best_champseason_place = df["Best championship position"].str.split(n=1, expand=True)
+            df["Best championship position"] = best_champseason_place[0]
+            best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
+            df["Best championship year"] = best_champseason_year[2]
+            df["Best championship position"] = df["Best championship position"].astype(str)
+            df["Best championship year"] = df["Best championship year"].astype(str)
+            df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
+
+                
+            #Convert dates/times
+            df["Date of birth"] = pd.to_datetime(df["Date of birth"], infer_datetime_format=True, errors = 'coerce')
+            df["Date of death"] = pd.to_datetime(df["Date of death"], infer_datetime_format=True, errors = 'coerce')
+
+            #fix other data types
+            df["Driver First Name"] = df["Driver First Name"].astype(str)
+            df["Driver Second Name"] = df["Driver Second Name"].astype(str)
+            df["Nationality"] = df["Nationality"].astype(str)
+            df["Hometown"] = df["Hometown"].astype(str)
+            df["Driver Second Name"] = df["Driver Second Name"].astype(str)
+            df["Points"] = df["Points"].astype(float)
+
+            cols = df.columns.to_list()
+            cols = cols[0:8]+[cols[-7]]+cols[-5:]+cols[8:-5]
+            df = df.drop("First Race", axis=1)
+            df = df.drop("Last Race", axis=1)
+            df = df.drop("Year active", axis=1)
+            return df
+
+        if type == 'Team':
+            f = open('teams_data.json')
+            data = json.load(f)
+            df = pd.DataFrame(data)
+
+
+            #Separate circuits and years for first race and last race
+
+            first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
+            last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+
+            df["Debut Year"] = first_race_data[1]
+            df["Debut Circuit"] = first_race_data[0]
+            df["Debut Circuit"] = df["Debut Circuit"].astype(str)
+            df["Final Year"] = last_race_data[1]
+            df["Final Circuit"] = last_race_data[0]
+            df["Final Circuit"] = df["Final Circuit"].astype(str)
+
+            #Separate best position and year
+            df["Best championship position (constructor)"] = df["Best championship position (constructor)"].astype(str)
+            best_champseason_place = df["Best championship position (constructor)"].str.split(n=1, expand=True)
+            df["Best championship position"] = best_champseason_place[0]
+            df["Best championship year"] = best_champseason_place[1]
+            df["Best championship position"] = df["Best championship position"].astype(str)
+            df["Best championship year"] = df["Best championship year"].astype(str)
+            df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
+            best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
+            df["Best championship year"] = best_champseason_year[1]
+
+            df["Best championship position (driver)"] = df["Best championship position (driver)"].astype(str)
+            best_champdriverseason_place = df["Best championship position (driver)"].str.split(n=2, expand=True)
+            df["Best championship position (driver)"] = best_champdriverseason_place[0]
+            df["Best championship year (driver)"] = best_champdriverseason_place[1]
+            df["Best championship driver"] = best_champdriverseason_place[2]
+            cols = df.columns.to_list()
+            df = df.drop("First Race", axis=1)
+            df = df.drop("Last Race", axis=1)
+            df = df.drop("Best championship position (constructor)", axis=1)
+            df.to_sql('Teams', engine, if_exists='replace')
+            return df
+
+        if type =='Champs':
+            f = open('champs_data.json')
+            data = json.load(f)
+            df = pd.DataFrame(data)
+            df.to_sql('Champions', engine, if_exists='replace')
+            return df
+
+        if type == 'Circuit':
+            f = open('circuit_data.json')
+            data = json.load(f)
+            df = pd.DataFrame(data)
+            df.to_sql('Circuits', engine, if_exists='replace')
+            return df
+
 if __name__ == "__main__":
+    DATABASE_TYPE = 'postgresql'
+    DBAPI = 'psycopg2'
+    HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
+    USER = 'postgres'
+    PASSWORD = 'T00narmyf1s'
+    DATABASE = 'Formula1'
+    PORT = 5432
+
+    engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+
     scraper = Scraper("https://www.4mula1stats.com/", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
+   
+    
+    # retrieve all new data
     if scraper.args.drivers:
         scraper.navigate_drivers()
         scraper.get_driver_data()
+        df = scraper.clean_data('Driver')
+        old_data = pd.read_sql_query('''SELECT * FROM "Drivers"''',con=engine)
+        merged_dfs = pd.concat((old_data, df))
+        merged_dfs.drop_duplicates(subset=['Driver number'], keep=False)
     if scraper.args.teams:
         scraper.navigate_teams()
         scraper.get_team_data()
+        df = scraper.clean_data('Team')
+        old_data = engine.execute('''SELECT * FROM "Teams"''').all()
+        merged_dfs = pd.concat((old_data, df))
+        merged_dfs.drop_duplicates(keep=False)
     if scraper.args.championships:
         scraper.navigate_champs()
         scraper.get_champs_data()
+        df = scraper.clean_data('Champs')
+        old_data = engine.execute('''SELECT * FROM "Champions""''').all()
+        merged_dfs = pd.concat((old_data, df))
+        merged_dfs.drop_duplicates(keep=False)
 
+    
+    # scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
+    # if scraper.args.circuits:
+    #     scraper2.navigate_circuits()
+    #     scraper2.get_circuit_data()
+    #     df = scraper2.clean_data('Circuit')
+    #     old_data = engine.execute('''SELECT * FROM "Circuits"''').all()
+    #     merged_dfs = pd.concat((old_data, new_data))
+    #     merged_dfs.drop_duplicates(keep=False)
+    # scraper.uploadtos3('driver_data.json')
+    # scraper.uploadtos3('teams_data.json')
+    # scraper.uploadtos3('champs_data.json')
+    # scraper2.uploadtos3('circuit_data.json')

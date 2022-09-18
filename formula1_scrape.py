@@ -13,6 +13,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy import inspect
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 from cgitb import text
 from numpy import append
 from requests import request
@@ -36,6 +37,17 @@ class Scraper:
 
     def __init__(self, URL : str, driver : webdriver.Chrome, parent_dir : str):
 
+        DATABASE_TYPE = 'postgresql'
+        DBAPI = 'psycopg2'
+        HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
+        USER = 'postgres'
+        PASSWORD = 'T00narmyf1s'
+        DATABASE = 'Formula1'
+        PORT = 5432
+
+        #make connection to specified database
+        self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+
         self.parser = argparse.ArgumentParser(description='Decide what statistics to scrape')
         self.parser.add_argument('-d','--drivers', default=False, action='store_true', help='Scrape Drivers:True/False')
         self.parser.add_argument('-t', '--teams', default=False, action='store_true', help='Scrape Teams:True/False')
@@ -55,7 +67,7 @@ class Scraper:
             raw_data = os.mkdir(path)
         try:
             self.__load_and_accept_cookies()
-        except webdriver.NoSuchElementException:
+        except NoSuchElementException:
             pass
         
     def __load_and_accept_cookies(self) -> None:
@@ -485,69 +497,87 @@ class Scraper:
             df = df.drop("First Race", axis=1)
             df = df.drop("Last Race", axis=1)
             df = df.drop("Best championship position (constructor)", axis=1)
-            df.to_sql('Teams', engine, if_exists='replace')
+            df.to_sql('Teams', self.engine, if_exists='replace')
             return df
 
         if type =='Champs':
             f = open('champs_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
-            df.to_sql('Champions', engine, if_exists='replace')
+            df.to_sql('Champions', self.engine, if_exists='replace')
             return df
 
         if type == 'Circuit':
             f = open('circuit_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
-            df.to_sql('Circuits', engine, if_exists='replace')
+            df.to_sql('Circuits', self.engine, if_exists='replace')
             return df
+    
+    def prevent_rescrape(self, data_table, data_frame):
+
+        DATABASE_TYPE = 'postgresql'
+        DBAPI = 'psycopg2'
+        HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
+        USER = 'postgres'
+        PASSWORD = 'T00narmyf1s'
+        DATABASE = 'Formula1'
+        PORT = 5432
+
+        #make connection to specified database
+        engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+
+        if data_table == "Drivers":
+            sql_statement = '''SELECT * FROM "Drivers"'''
+            subset = 'Driver number'
+        elif data_table == "Teams":
+            sql_statement = '''SELECT * FROM "Teams"'''
+            subset = 'Driver number'
+        elif data_table == "Champions":
+            sql_statement = '''SELECT * FROM "Champions"'''
+            subset = 'Year number'
+        elif data_table == "Circuits":
+            sql_statement = '''SELECT * FROM "Circuits"'''
+            subset = 'Track Number'
+
+        #compare old data and new data and drop duplicates
+        old_data = pd.read_sql_query(sql_statement,con=engine)
+        merged_dfs = pd.concat((old_data, data_frame))
+        merged_dfs = merged_dfs.drop_duplicates(subset=subset)
+        print(merged_dfs)
+
+        #upload what is left to database
+        merged_dfs.to_sql(data_table, self.engine, if_exists='replace', index = False)
+        self.engine.execute('ALTER TABLE "Drivers" ADD PRIMARY KEY ("Driver number");')
 
 if __name__ == "__main__":
-    DATABASE_TYPE = 'postgresql'
-    DBAPI = 'psycopg2'
-    HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
-    USER = 'postgres'
-    PASSWORD = 'T00narmyf1s'
-    DATABASE = 'Formula1'
-    PORT = 5432
-
-    engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
-
+    
     scraper = Scraper("https://www.4mula1stats.com/", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
    
-    
     # retrieve all new data
     if scraper.args.drivers:
         scraper.navigate_drivers()
         scraper.get_driver_data()
         df = scraper.clean_data('Driver')
-        old_data = pd.read_sql_query('''SELECT * FROM "Drivers"''',con=engine)
-        merged_dfs = pd.concat((old_data, df))
-        merged_dfs.drop_duplicates(subset=['Driver number'], keep=False)
+        scraper.prevent_rescrape("Drivers", df)
     if scraper.args.teams:
         scraper.navigate_teams()
         scraper.get_team_data()
         df = scraper.clean_data('Team')
-        old_data = engine.execute('''SELECT * FROM "Teams"''').all()
-        merged_dfs = pd.concat((old_data, df))
-        merged_dfs.drop_duplicates(keep=False)
+        scraper.prevent_rescrape("Teams")
     if scraper.args.championships:
         scraper.navigate_champs()
         scraper.get_champs_data()
         df = scraper.clean_data('Champs')
-        old_data = engine.execute('''SELECT * FROM "Champions""''').all()
-        merged_dfs = pd.concat((old_data, df))
-        merged_dfs.drop_duplicates(keep=False)
-
+        scraper.prevent_rescrape("Champions")
     
     # scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
     # if scraper.args.circuits:
     #     scraper2.navigate_circuits()
     #     scraper2.get_circuit_data()
     #     df = scraper2.clean_data('Circuit')
-    #     old_data = engine.execute('''SELECT * FROM "Circuits"''').all()
-    #     merged_dfs = pd.concat((old_data, new_data))
-    #     merged_dfs.drop_duplicates(keep=False)
+    #     scraper.prevent_rescrape("Circuits")
+
     # scraper.uploadtos3('driver_data.json')
     # scraper.uploadtos3('teams_data.json')
     # scraper.uploadtos3('champs_data.json')

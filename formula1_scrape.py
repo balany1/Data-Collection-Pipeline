@@ -275,7 +275,7 @@ class Scraper:
             self.dict_entry={}
             self.dict_entry["ID"] = uuid.uuid4().hex
             team_count = team_count + 1
-            self.dict_entry["Driver number"] = team_count
+            self.dict_entry["Team number"] = team_count
 
             #opens each page in the list of URLs
             self.driver.get(link)
@@ -393,110 +393,156 @@ class Scraper:
         out_file.close()
 
     def uploadtos3(self, file):
+
+        """Uploads the json file to s3
+
+
+        Args:
+            file: the file name to be uploaded to the s3 bucket
+
+        """
         BUCKET_NAME= "formula1-aicore"
 
         s3 = boto3.client("s3")
 
-        def uploadDirectory(path,bucketname):
+        def __uploadDirectory(path,bucketname):
                 for root,dirs,files in os.walk(path):
                     for file in files:
                         s3.upload_file(os.path.join(root,file),bucketname,file)
 
-        uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/back_up",BUCKET_NAME)
+        __uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/back_up",BUCKET_NAME)
         
     def clean_data(self, data_type):
+        """Cleans the data using pandas
 
+
+        Args:
+            data_type: selects which set of data is being cleaned 
+        Returns:
+            df: the clean data drame to be uploaded to RDS
+
+        """
         if data_type == 'Driver':
             f = open('driver_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
-
-            #fix other data types
-            df["First Race"] = df["First Race"].astype(str)
-            #Consistency for Nationalities
-            df["Nationality"] = df["Nationality"].str.title()
+            try:
+                #fix other data types
+                df["First Race"] = df["First Race"].astype(str)
+                #Consistency for Nationalities
+                df["Nationality"] = df["Nationality"].str.title()
+            except KeyError:
+                pass
 
             #Separate circuits and years for first race and last race
+            try:
+                first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
+                last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+            except KeyError:
+                pass
+            
+            try:
+                df["Debut Year"] = first_race_data[1]
+                df["Debut Circuit"] = first_race_data[0]
+                df["Debut Circuit"] = df["Debut Circuit"].astype(str)
+                df["Final Year"] = last_race_data[1]
+                df["Final Circuit"] = last_race_data[0]
+                df["Final Circuit"] = df["Final Circuit"].astype(str)
+            except KeyError:
+                pass
+            
+            try:
+                #Separate best position and year
+                df["Best championship position"] = df["Best championship position"].astype(str)
+                best_champseason_place = df["Best championship position"].str.split(n=1, expand=True)
+                df["Best championship position"] = best_champseason_place[0]
+                best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
+                df["Best championship year"] = best_champseason_year[2]
+                df["Best championship position"] = df["Best championship position"].astype(str)
+                df["Best championship year"] = df["Best championship year"].astype(str)
+                df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
+            except KeyError:
+                pass
 
-            first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
-            last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+            try:    
+                #Convert dates/times
+                df["Date of birth"] = pd.to_datetime(df["Date of birth"], infer_datetime_format=True, errors = 'coerce')
+                df["Date of death"] = pd.to_datetime(df["Date of death"], infer_datetime_format=True, errors = 'coerce')
+            except KeyError:
+                pass
 
-            df["Debut Year"] = first_race_data[1]
-            df["Debut Circuit"] = first_race_data[0]
-            df["Debut Circuit"] = df["Debut Circuit"].astype(str)
-            df["Final Year"] = last_race_data[1]
-            df["Final Circuit"] = last_race_data[0]
-            df["Final Circuit"] = df["Final Circuit"].astype(str)
+            try:
+                #fix other data types
+                df["Driver First Name"] = df["Driver First Name"].astype(str)
+                df["Driver Second Name"] = df["Driver Second Name"].astype(str)
+                df["Nationality"] = df["Nationality"].astype(str)
+                df["Hometown"] = df["Hometown"].astype(str)
+                df["Driver Second Name"] = df["Driver Second Name"].astype(str)
+                df["Points"] = df["Points"].astype(float)
+            except KeyError:
+                pass
 
-
-            #Separate best position and year
-            df["Best championship position"] = df["Best championship position"].astype(str)
-            best_champseason_place = df["Best championship position"].str.split(n=1, expand=True)
-            df["Best championship position"] = best_champseason_place[0]
-            best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
-            df["Best championship year"] = best_champseason_year[2]
-            df["Best championship position"] = df["Best championship position"].astype(str)
-            df["Best championship year"] = df["Best championship year"].astype(str)
-            df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
-
-                
-            #Convert dates/times
-            df["Date of birth"] = pd.to_datetime(df["Date of birth"], infer_datetime_format=True, errors = 'coerce')
-            df["Date of death"] = pd.to_datetime(df["Date of death"], infer_datetime_format=True, errors = 'coerce')
-
-            #fix other data types
-            df["Driver First Name"] = df["Driver First Name"].astype(str)
-            df["Driver Second Name"] = df["Driver Second Name"].astype(str)
-            df["Nationality"] = df["Nationality"].astype(str)
-            df["Hometown"] = df["Hometown"].astype(str)
-            df["Driver Second Name"] = df["Driver Second Name"].astype(str)
-            df["Points"] = df["Points"].astype(float)
-
-            cols = df.columns.to_list()
-            cols = cols[0:8]+[cols[-7]]+cols[-5:]+cols[8:-5]
-            df = df.drop("First Race", axis=1)
-            df = df.drop("Last Race", axis=1)
-            df = df.drop("Year active", axis=1)
-            return df
+            try:    
+                cols = df.columns.to_list()
+                cols = cols[0:8]+[cols[-7]]+cols[-5:]+cols[8:-5]
+                df = df.drop("First Race", axis=1)
+                df = df.drop("Last Race", axis=1)
+                df = df.drop("Year active", axis=1)
+                return df
+            except KeyError:
+                pass
 
         if type == 'Team':
             f = open('teams_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
 
+            try:
+                #Separate circuits and years for first race and last race
 
-            #Separate circuits and years for first race and last race
+                first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
+                last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+            except:
+                pass
+            
+            try:
+                df["Debut Year"] = first_race_data[1]
+                df["Debut Circuit"] = first_race_data[0]
+                df["Debut Circuit"] = df["Debut Circuit"].astype(str)
+                df["Final Year"] = last_race_data[1]
+                df["Final Circuit"] = last_race_data[0]
+                df["Final Circuit"] = df["Final Circuit"].astype(str)
+            except KeyError:
+                pass
 
-            first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
-            last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+            try:    
+                #Separate best position and year
+                df["Best championship position (constructor)"] = df["Best championship position (constructor)"].astype(str)
+                best_champseason_place = df["Best championship position (constructor)"].str.split(n=1, expand=True)
+                df["Best championship position"] = best_champseason_place[0]
+                df["Best championship year"] = best_champseason_place[1]
+                df["Best championship position"] = df["Best championship position"].astype(str)
+                df["Best championship year"] = df["Best championship year"].astype(str)
+                df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
+                best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
+                df["Best championship year"] = best_champseason_year[1]
+                df["Best championship position (driver)"] = df["Best championship position (driver)"].astype(str)
+                best_champdriverseason_place = df["Best championship position (driver)"].str.split(n=2, expand=True)
+                df["Best championship position (driver)"] = best_champdriverseason_place[0]
+                df["Best championship year (driver)"] = best_champdriverseason_place[1]
+                df["Best championship driver"] = best_champdriverseason_place[2]
+            except KeyError:
+                pass
 
-            df["Debut Year"] = first_race_data[1]
-            df["Debut Circuit"] = first_race_data[0]
-            df["Debut Circuit"] = df["Debut Circuit"].astype(str)
-            df["Final Year"] = last_race_data[1]
-            df["Final Circuit"] = last_race_data[0]
-            df["Final Circuit"] = df["Final Circuit"].astype(str)
+            try:
 
-            #Separate best position and year
-            df["Best championship position (constructor)"] = df["Best championship position (constructor)"].astype(str)
-            best_champseason_place = df["Best championship position (constructor)"].str.split(n=1, expand=True)
-            df["Best championship position"] = best_champseason_place[0]
-            df["Best championship year"] = best_champseason_place[1]
-            df["Best championship position"] = df["Best championship position"].astype(str)
-            df["Best championship year"] = df["Best championship year"].astype(str)
-            df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
-            best_champseason_year = best_champseason_place[1].str.split(n=2, expand=True)
-            df["Best championship year"] = best_champseason_year[1]
+                cols = df.columns.to_list()
+                df = df.drop("First Race", axis=1)
+                df = df.drop("Last Race", axis=1)
+                df = df.drop("Best championship position (constructor)", axis=1)
+            except KeyError:
+                pass
 
-            df["Best championship position (driver)"] = df["Best championship position (driver)"].astype(str)
-            best_champdriverseason_place = df["Best championship position (driver)"].str.split(n=2, expand=True)
-            df["Best championship position (driver)"] = best_champdriverseason_place[0]
-            df["Best championship year (driver)"] = best_champdriverseason_place[1]
-            df["Best championship driver"] = best_champdriverseason_place[2]
-            cols = df.columns.to_list()
-            df = df.drop("First Race", axis=1)
-            df = df.drop("Last Race", axis=1)
-            df = df.drop("Best championship position (constructor)", axis=1)
             df.to_sql('Teams', self.engine, if_exists='replace')
             return df
 
@@ -516,6 +562,13 @@ class Scraper:
     
     def prevent_rescrape(self, data_table, data_frame):
 
+        """Checks the database to compare to the data scraped
+        
+        Args:
+            data_table: The table to be read from the database (Drivers, Teams, Champions or Circuits
+            data_frame: The clean dataframe that is left after the scraped data has been cleaned)
+        """
+
         DATABASE_TYPE = 'postgresql'
         DBAPI = 'psycopg2'
         HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
@@ -532,7 +585,7 @@ class Scraper:
             subset = 'Driver number'
         elif data_table == "Teams":
             sql_statement = '''SELECT * FROM "Teams"'''
-            subset = 'Driver number'
+            subset = 'Team number'
         elif data_table == "Champions":
             sql_statement = '''SELECT * FROM "Champions"'''
             subset = 'Year number'
@@ -544,11 +597,10 @@ class Scraper:
         old_data = pd.read_sql_query(sql_statement,con=engine)
         merged_dfs = pd.concat((old_data, data_frame))
         merged_dfs = merged_dfs.drop_duplicates(subset=subset)
-        print(merged_dfs)
 
         #upload what is left to database
         merged_dfs.to_sql(data_table, self.engine, if_exists='replace', index = False)
-        self.engine.execute('ALTER TABLE "Drivers" ADD PRIMARY KEY ("Driver number");')
+        self.engine.execute(f'ALTER TABLE "{data_table}" ADD PRIMARY KEY ("{subset}");')
 
 if __name__ == "__main__":
     
@@ -564,12 +616,12 @@ if __name__ == "__main__":
         scraper.navigate_teams()
         scraper.get_team_data()
         df = scraper.clean_data('Team')
-        scraper.prevent_rescrape("Teams")
+        scraper.prevent_rescrape("Teams", df)
     if scraper.args.championships:
         scraper.navigate_champs()
         scraper.get_champs_data()
         df = scraper.clean_data('Champs')
-        scraper.prevent_rescrape("Champions")
+        scraper.prevent_rescrape("Champions", df)
     
     # scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
     # if scraper.args.circuits:

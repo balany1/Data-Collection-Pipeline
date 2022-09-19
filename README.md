@@ -187,4 +187,107 @@ which only needed to check that the correct URL was reached and that the URL was
 
 This checked the length of dictionary produced was correct and that the type of output was in fact a dictionary. The unit test further checked that the types of the key pairs were as they should be. These tests were applied to both the teams and champions data as such testing all the public methods.
 
+Milestone 6:
+
+This part of the code looks at the json files that have been created and cleans the data using pandas. try/except statements are used to deal with key errors that can come up when cleaning data that is inconsistent.
+
+if data_type == 'Driver':
+            f = open('driver_data.json')
+            data = json.load(f)
+            df = pd.DataFrame(data)
+            try:
+                #fix other data types
+                df["First Race"] = df["First Race"].astype(str)
+                #Consistency for Nationalities
+                df["Nationality"] = df["Nationality"].str.title()
+            except KeyError:
+                pass
+
+            #Separate circuits and years for first race and last race
+            try:
+                first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
+                last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
+            except KeyError:
+                pass
+            
+            try:
+                df["Debut Year"] = first_race_data[1]
+                df["Debut Circuit"] = first_race_data[0]
+                df["Debut Circuit"] = df["Debut Circuit"].astype(str)
+                df["Final Year"] = last_race_data[1]
+                df["Final Circuit"] = last_race_data[0]
+                df["Final Circuit"] = df["Final Circuit"].astype(str)
+            except KeyError:
+                pass
+
+
+At this point, AWS is used to set up RDS database and S3 bucket to scalably store data. boto3 is used to upload to s3 and a method is created to complete the upload as well as a method to upload to the Postgresql database. 
+
+
+ def uploadtos3(self, file):
+
+        """Uploads the json file to s3
+
+
+        Args:
+            file: the file name to be uploaded to the s3 bucket
+
+        """
+        BUCKET_NAME= "formula1-aicore"
+
+        s3 = boto3.client("s3")
+
+        def uploadDirectory(path,bucketname):
+                for root,dirs,files in os.walk(path):
+                    for file in files:
+                        s3.upload_file(os.path.join(root,file),bucketname,file)
+
+        uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/back_up",BUCKET_NAME)
+
+The method that uploads to the database is below and has provision to check for exisitng data. It does this by reading the existing data and comparing to the new table that has been scraped and using pandas to drop duplicates. sqlalchemy and psycopg2 are used to create a connection to the RDS database and execute the sql queries
+
+    def prevent_rescrape(self, data_table, data_frame):
+
+        """Checks the database to compare to the data scraped
+        
+        Args:
+            data_table: The table to be read from the database (Drivers, Teams, Champions or Circuits
+            data_frame: The clean dataframe that is left after the scraped data has been cleaned)
+        """
+
+        DATABASE_TYPE = 'postgresql'
+        DBAPI = 'psycopg2'
+        HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
+        USER = 'postgres'
+        PASSWORD = 'T00narmyf1s'
+        DATABASE = 'Formula1'
+        PORT = 5432
+
+        #make connection to specified database
+        engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+
+        if data_table == "Drivers":
+            sql_statement = '''SELECT * FROM "Drivers"'''
+            subset = 'Driver number'
+        elif data_table == "Teams":
+            sql_statement = '''SELECT * FROM "Teams"'''
+            subset = 'Team number'
+        elif data_table == "Champions":
+            sql_statement = '''SELECT * FROM "Champions"'''
+            subset = 'Year number'
+        elif data_table == "Circuits":
+            sql_statement = '''SELECT * FROM "Circuits"'''
+            subset = 'Track Number'
+
+        #compare old data and new data and drop duplicates
+        old_data = pd.read_sql_query(sql_statement,con=engine)
+        merged_dfs = pd.concat((old_data, data_frame))
+        merged_dfs = merged_dfs.drop_duplicates(subset=subset)
+
+        #upload what is left to database
+        merged_dfs.to_sql(data_table, self.engine, if_exists='replace', index = False)
+        self.engine.execute(f'ALTER TABLE "{data_table}" ADD PRIMARY KEY ("{subset}");')
+
+
+
 

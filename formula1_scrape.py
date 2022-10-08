@@ -1,24 +1,30 @@
-from lib2to3.pgen2.pgen import DFAState
-import time
-from tracemalloc import start
-import uuid
-import os
-import json
-import urllib.request
-import urllib
 import argparse
 import boto3 
-import psycopg2
-import pandas as pd
-from sqlalchemy import create_engine
-from sqlalchemy import inspect
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
 from cgitb import text
+import json
+from lib2to3.pgen2.pgen import DFAState
+import logging
+import numpy as np
 from numpy import append
+import os
+import pandas as pd
+from psycopg2 import errors
 from requests import request
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import sqlalchemy
+from sqlalchemy import create_engine
+from sqlalchemy import inspect
+from sqlite3 import ProgrammingError
+import time
+from tracemalloc import start
 from traitlets import Bool
+import urllib
+import urllib.request
+import uuid
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 class Scraper:
@@ -35,7 +41,7 @@ class Scraper:
 
     """
 
-    def __init__(self, URL : str, driver : webdriver.Chrome, parent_dir : str):
+    def __init__(self, URL : str, parent_dir : str, headless: bool = False):
 
         DATABASE_TYPE = 'postgresql'
         DBAPI = 'psycopg2'
@@ -45,8 +51,19 @@ class Scraper:
         DATABASE = 'Formula1'
         PORT = 5432
 
+        if headless:
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--start-maximized")
+            chrome_options.headless = True
+            self.driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+        else:
+            self.driver = webdriver.Chrome(ChromeDriverManager().install())
+
         #make connection to specified database
         self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+        logging.basicConfig(filename="scraperlog.log",format="%(asctime)s - %(levelname)s - %(message)s")
 
         self.parser = argparse.ArgumentParser(description='Decide what statistics to scrape')
         self.parser.add_argument('-d','--drivers', default=False, action='store_true', help='Scrape Drivers:True/False')
@@ -54,7 +71,6 @@ class Scraper:
         self.parser.add_argument('-c', '--championships', default=False, action='store_true', help='Scrape Championships:True/False')
         self.parser.add_argument('-l', '--circuits', default=False, action='store_true', help='Scrape Circuits:True/False')
         self.args = self.parser.parse_args()
-        self.driver = driver
         self.URL = URL
         self.driver_list=[]
         self.teams_list= []
@@ -67,7 +83,8 @@ class Scraper:
             raw_data = os.mkdir(path)
         try:
             self.__load_and_accept_cookies()
-        except NoSuchElementException:
+        except NoSuchElementException as NSE:
+            logging.error(NSE)
             pass
         
     def __load_and_accept_cookies(self) -> None:
@@ -92,7 +109,7 @@ class Scraper:
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
         self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
     
-    def get_no_of_pages(self,default_len : int ,title : str):
+    def get_no_of_pages(self,default_len : int , title : str):
 
         """Scrapes URL for each driver/team/championship year
         
@@ -129,7 +146,7 @@ class Scraper:
                         entry = entry
                     self.dict_entry[column_data[i].text] = entry
 
-    def __get_URL_list(self,element : str ,title : str):
+    def __get_URL_list(self, element : str , title : str):
 
         """Scrapes URL for each driver
         
@@ -219,9 +236,9 @@ class Scraper:
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
-            self.dict_entry["ID"] = uuid.uuid4().hex
+            self.dict_entry["ID"] = uuid.uuid3(uuid.NAMESPACE_URL, link).hex
             driver_count = driver_count + 1
-            self.dict_entry["Driver number"] = driver_count
+            self.dict_entry["driver number"] = driver_count
             #opens each URL in the list
             self.driver.get(link)
 
@@ -236,7 +253,7 @@ class Scraper:
             self.driver_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.driver_list, "driver_data.json")
+        self.__dumptojson(self.driver_list, "raw_data/driver_data.json")
 
     def navigate_teams(self):
 
@@ -273,7 +290,7 @@ class Scraper:
             
             #resets the dictionary entry to blank at the beginning of each URL
             self.dict_entry={}
-            self.dict_entry["ID"] = uuid.uuid4().hex
+            self.dict_entry["ID"] = uuid.uuid3(uuid.NAMESPACE_URL, link).hex
             team_count = team_count + 1
             self.dict_entry["Team number"] = team_count
 
@@ -293,9 +310,7 @@ class Scraper:
             self.teams_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.teams_list, "teams_data.json")
-
-        self.clean_data('Team')
+        self.__dumptojson(self.teams_list, "raw_data/teams_data.json")
 
     def navigate_champs(self):
 
@@ -331,14 +346,12 @@ class Scraper:
                 self.champs_list.append(self.dict_entry)
                 
         #dump to json file
-        self.__dumptojson(self.champs_list, "champs_data.json")
-
-        self.clean_data('Champs')
+        self.__dumptojson(self.champs_list, "raw_data/champs_data.json")
 
     def navigate_circuits(self):
         self.driver.get(self.URL)
         self.driver.maximize_window()
-        navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='row-2']").find_element(by=By.LINK_TEXT, value = "Circuits").click()
+        navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='row-2']").find_element(by=By.XPATH, value = "//a[@id='ctl00_HL_CircuitH']").click()
 
     def get_circuit_data(self):
         self.__create_dir("circuit_data")
@@ -361,11 +374,9 @@ class Scraper:
                 self.circuit_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.circuit_list, "circuit_data.json")
+        self.__dumptojson(self.circuit_list, "raw_data/circuit_data.json")
 
-        self.clean_data('Circuit')
-
-    def __create_dir(self,directory : str):
+    def __create_dir(self,directory: str):
         
         """Checks if the path/folder to be created already exists and if not, creates the directory
 
@@ -378,7 +389,7 @@ class Scraper:
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
 
-    def __dumptojson(self, dictionary : str, out_file : str):
+    def __dumptojson(self, dictionary: str, out_file: str):
 
         """Dumps the collected information into a named file.json
 
@@ -396,7 +407,6 @@ class Scraper:
 
         """Uploads the json file to s3
 
-
         Args:
             file: the file name to be uploaded to the s3 bucket
 
@@ -410,9 +420,9 @@ class Scraper:
                     for file in files:
                         s3.upload_file(os.path.join(root,file),bucketname,file)
 
-        __uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/back_up",BUCKET_NAME)
+        __uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/",BUCKET_NAME)
         
-    def clean_data(self, data_type):
+    def clean_data(self, data_type : str):
         """Cleans the data using pandas
 
 
@@ -421,9 +431,10 @@ class Scraper:
         Returns:
             df: the clean data drame to be uploaded to RDS
 
+
         """
-        if data_type == 'Driver':
-            f = open('driver_data.json')
+        if data_type == 'driver':
+            f = open('raw_data/driver_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
             try:
@@ -431,15 +442,17 @@ class Scraper:
                 df["First Race"] = df["First Race"].astype(str)
                 #Consistency for Nationalities
                 df["Nationality"] = df["Nationality"].str.title()
-            except KeyError:
-                pass
+            except KeyError as K:
+                logging.error(K)
+                
 
             #Separate circuits and years for first race and last race
             try:
                 first_race_data = df["First Race"].str.rsplit(n=1, expand=True)
                 last_race_data = df["Last Race"].str.rsplit(n=1, expand=True)
-            except KeyError:
-                pass
+            except KeyError as K2:
+                logging.error(K2)
+               
             
             try:
                 df["Debut Year"] = first_race_data[1]
@@ -448,8 +461,12 @@ class Scraper:
                 df["Final Year"] = last_race_data[1]
                 df["Final Circuit"] = last_race_data[0]
                 df["Final Circuit"] = df["Final Circuit"].astype(str)
-            except KeyError:
-                pass
+            except KeyError as K3:
+                df["Debut Year"] = None
+                df["Debut Circuit"] = None
+                df["Final Year"] = None
+                df["Final Circuit"] = None
+                logging.error(K3)
             
             try:
                 #Separate best position and year
@@ -461,15 +478,25 @@ class Scraper:
                 df["Best championship position"] = df["Best championship position"].astype(str)
                 df["Best championship year"] = df["Best championship year"].astype(str)
                 df.loc[df["Best championship position"] == "World", "Best championship position"] = "1st"
-            except KeyError:
+            except KeyError as K4:
+                df["Best championship position"] = None
+                df["Best championship year"] = None
+                logging.error(K4)
+                
+            if 'Known as' not in df.columns:
+                df["Known as"] = None
+            else:
                 pass
-
+                
             try:    
                 #Convert dates/times
                 df["Date of birth"] = pd.to_datetime(df["Date of birth"], infer_datetime_format=True, errors = 'coerce')
                 df["Date of death"] = pd.to_datetime(df["Date of death"], infer_datetime_format=True, errors = 'coerce')
-            except KeyError:
-                pass
+            except KeyError as K5:
+                df["Date of birth"] = None
+                df["Date of death"] = None
+                logging.error(K5)
+                
 
             try:
                 #fix other data types
@@ -478,9 +505,13 @@ class Scraper:
                 df["Nationality"] = df["Nationality"].astype(str)
                 df["Hometown"] = df["Hometown"].astype(str)
                 df["Driver Second Name"] = df["Driver Second Name"].astype(str)
+                df = df.replace('-',np.nan)
+                df = df.replace('', np.nan)
                 df["Points"] = df["Points"].astype(float)
-            except KeyError:
-                pass
+
+            except KeyError as K6:
+                logging.error(K6)
+                
 
             try:    
                 cols = df.columns.to_list()
@@ -488,12 +519,18 @@ class Scraper:
                 df = df.drop("First Race", axis=1)
                 df = df.drop("Last Race", axis=1)
                 df = df.drop("Year active", axis=1)
-                return df
-            except KeyError:
-                pass
+                   
+            except KeyError as K7:
+                logging.error(K7)
 
-        if type == 'Team':
-            f = open('teams_data.json')
+            df.columns = df.columns.str.lower()
+            df.columns = df.columns.str.replace(' ','_')
+           
+            return df
+     
+
+        if data_type == 'team':
+            f = open('raw_data/teams_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
 
@@ -512,8 +549,14 @@ class Scraper:
                 df["Final Year"] = last_race_data[1]
                 df["Final Circuit"] = last_race_data[0]
                 df["Final Circuit"] = df["Final Circuit"].astype(str)
-            except KeyError:
-                pass
+            except KeyError as K8:
+                logging.error(K8)
+                df["Debut Year"] = None
+                df["Debut Circuit"] = None
+                df["Debut Circuit"] = None
+                df["Final Circuit"] = None
+                df["Final Circuit"] = None
+                
 
             try:    
                 #Separate best position and year
@@ -531,8 +574,14 @@ class Scraper:
                 df["Best championship position (driver)"] = best_champdriverseason_place[0]
                 df["Best championship year (driver)"] = best_champdriverseason_place[1]
                 df["Best championship driver"] = best_champdriverseason_place[2]
-            except KeyError:
-                pass
+            except KeyError as K9:
+                df["Best championship year"] = None
+                df["Best championship position"] = None
+                df["Best championship position (driver)"] = None
+                df["Best championship year (driver)"] = None
+                df["Best championship driver"] = None
+                logging.error(K9)
+                
 
             try:
 
@@ -540,26 +589,34 @@ class Scraper:
                 df = df.drop("First Race", axis=1)
                 df = df.drop("Last Race", axis=1)
                 df = df.drop("Best championship position (constructor)", axis=1)
-            except KeyError:
-                pass
-
-            df.to_sql('Teams', self.engine, if_exists='replace')
+            except KeyError as K10:
+                logging.error(K10)
+                
+            df = df.replace(" ",None)
+            df.columns = df.columns.str.lower()
+            df.columns = df.columns.str.replace(' ','_')
+            print("when cleaning, type is" )
+            print(type(df))
             return df
+            
 
-        if type =='Champs':
-            f = open('champs_data.json')
+        if data_type =='champs':
+            f = open('raw_data/champs_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
-            df.to_sql('Champions', self.engine, if_exists='replace')
+            df.columns = df.columns.str.lower()
+            df.columns = df.columns.str.replace(' ','_')
             return df
+           
 
-        if type == 'Circuit':
-            f = open('circuit_data.json')
+        if data_type == 'circuit':
+            f = open('raw_data/circuit_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
-            df.to_sql('Circuits', self.engine, if_exists='replace')
+            df.columns = df.columns.str.lower()
+            df.columns = df.columns.str.replace(' ','_')
             return df
-    
+            
     def prevent_rescrape(self, data_table, data_frame):
 
         """Checks the database to compare to the data scraped
@@ -579,58 +636,81 @@ class Scraper:
 
         #make connection to specified database
         engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
-
-        if data_table == "Drivers":
-            sql_statement = '''SELECT * FROM "Drivers"'''
-            subset = 'Driver number'
-        elif data_table == "Teams":
-            sql_statement = '''SELECT * FROM "Teams"'''
-            subset = 'Team number'
-        elif data_table == "Champions":
-            sql_statement = '''SELECT * FROM "Champions"'''
-            subset = 'Year number'
-        elif data_table == "Circuits":
-            sql_statement = '''SELECT * FROM "Circuits"'''
-            subset = 'Track Number'
-
+        inspector = inspect(engine)
+        
+        if data_table == "drivers":
+            sql_statement = f'''SELECT * FROM "drivers" LIMIT {len(data_frame)}'''
+            subset = 'id'
+        elif data_table == "teams":
+            sql_statement = '''SELECT * FROM "teams"'''
+            subset = 'team_number'
+        elif data_table == "champions":
+            sql_statement = '''SELECT * FROM "champions"'''
+            subset = 'year_number'
+        elif data_table == "circuits":
+            sql_statement = '''SELECT * FROM "circuits"'''
+            subset = 'track_number'
         #compare old data and new data and drop duplicates
-        old_data = pd.read_sql_query(sql_statement,con=engine)
-        merged_dfs = pd.concat((old_data, data_frame))
-        merged_dfs = merged_dfs.drop_duplicates(subset=subset)
+        if inspector.has_table(data_table):
+            old_data = pd.read_sql_query(sql_statement,con=engine)
+            merged_dfs = pd.concat((old_data, data_frame))
+            merged_dfs = merged_dfs.drop_duplicates(subset, keep = False)
+            print("if table exists, type is ")
+            print(type(merged_dfs))
+        else:
+            merged_dfs = data_frame
+            print("if table doesnt't exist, type is ")
+            print(type(merged_dfs))
+        
 
         #upload what is left to database
-        merged_dfs.to_sql(data_table, self.engine, if_exists='replace', index = False)
-        self.engine.execute(f'ALTER TABLE "{data_table}" ADD PRIMARY KEY ("{subset}");')
+        merged_dfs.to_sql(data_table, self.engine, if_exists='append', index = False)
+        
+        #add primary key if it doesn't already exist
+        self.engine.execute(f'''DO $$ 
+                            BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = '{data_table}_pkey') THEN
+                            ALTER TABLE {data_table}
+                            ADD CONSTRAINT {data_table}_pkey
+                            PRIMARY KEY ({subset});
+                            ELSE
+                                RETURN;
+                            END IF;
+                            END;
+                            $$;;''')
+                
 
 if __name__ == "__main__":
     
-    scraper = Scraper("https://www.4mula1stats.com/", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
+    scraper = Scraper(URL = "https://www.4mula1stats.com/", parent_dir="/home/andrew/AICore_work/Data-Collection-Pipeline", headless = True)
    
     # retrieve all new data
     if scraper.args.drivers:
         scraper.navigate_drivers()
         scraper.get_driver_data()
-        df = scraper.clean_data('Driver')
-        scraper.prevent_rescrape("Drivers", df)
+        df = scraper.clean_data('driver')
+        scraper.prevent_rescrape("drivers", df)
+        #scraper.uploadtos3('driver_data.json')
     if scraper.args.teams:
         scraper.navigate_teams()
         scraper.get_team_data()
-        df = scraper.clean_data('Team')
-        scraper.prevent_rescrape("Teams", df)
+        df = scraper.clean_data('team')
+        scraper.prevent_rescrape("teams", df)
+        #scraper.uploadtos3('teams_data.json')
+        
     if scraper.args.championships:
         scraper.navigate_champs()
         scraper.get_champs_data()
-        df = scraper.clean_data('Champs')
-        scraper.prevent_rescrape("Champions", df)
+        df = scraper.clean_data('champs')
+        scraper.prevent_rescrape("champions", df)
+        #scraper.uploadtos3('champs_data.json')
     
-    # scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", webdriver.Chrome(), "/home/andrew/AICore_work/Data-Collection-Pipeline")
-    # if scraper.args.circuits:
-    #     scraper2.navigate_circuits()
-    #     scraper2.get_circuit_data()
-    #     df = scraper2.clean_data('Circuit')
-    #     scraper.prevent_rescrape("Circuits")
+    
+    if scraper.args.circuits:
+        scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", parent_dir="/home/andrew/AICore_work/Data-Collection-Pipeline", headless = True)
+        scraper2.navigate_circuits()
+        scraper2.get_circuit_data()
+        df = scraper2.clean_data('circuit')
+        scraper2.prevent_rescrape("circuits", df)
+        #scraper2.uploadtos3('circuit_data.json')
 
-    # scraper.uploadtos3('driver_data.json')
-    # scraper.uploadtos3('teams_data.json')
-    # scraper.uploadtos3('champs_data.json')
-    # scraper2.uploadtos3('circuit_data.json')

@@ -8,14 +8,18 @@ Milestone 2:
 
 The code at this stage currently opens the webpage and accepts cookies with the code:
 
-        accept_button = self.driver.find_element(by=By.XPATH, value="//*[@class='btn btn-success acceptGdpr']")
-        accept_button.click()
+```python
+accept_button = self.driver.find_element(by=By.XPATH, value="//*[@class='btn btn-success acceptGdpr']")
+accept_button.click()
+```
 
 There are then functions to navigate through the data pages, using the code(for instance for drivers):
 
+        ``` python
         navbar = self.driver.find_element(by=By.XPATH, value="//div[@class='navbar-nav']")
         drivers_button= navbar.find_element(by=By.LINK_TEXT, value = 'Drivers')
         drivers_button.click()
+        ```
 
 There are equivalent functions for teams and champions
 

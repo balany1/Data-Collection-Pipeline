@@ -79,7 +79,7 @@ class Scraper:
         self.champs_list = []
         self.circuit_list = []
         self.dict_entry = {}
-        directory = "raw_data"
+        directory = "."
         path = os.path.join(parent_dir, directory)
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
@@ -107,9 +107,10 @@ class Scraper:
     def __get_image(self):
 
         """Method that is called within get_driver_data that locates the element containing the drivers image and calls the function to download the image"""
-
+        if os.path.exists("./driver_images") == False:
+            raw_data = os.mkdir("./driver_images")
         img_src = self.driver.find_element(by=By.XPATH, value="//img[@class='col-md-3']").get_attribute('src')
-        self.__download_image(img_src, "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/driver_images/", self.__get_driver_name())
+        self.__download_image(img_src, "./driver_images/", self.__get_driver_name())
     
     def get_no_of_pages(self,default_len : int , title : str):
 
@@ -255,7 +256,7 @@ class Scraper:
             self.driver_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.driver_list, "raw_data/driver_data.json")
+        self.__dumptojson(self.driver_list, "./driver_data.json")
 
     def navigate_teams(self):
 
@@ -312,7 +313,7 @@ class Scraper:
             self.teams_list.append(self.dict_entry)
 
         #dump to json file
-        self.__dumptojson(self.teams_list, "raw_data/teams_data.json")
+        self.__dumptojson(self.teams_list, "./teams_data.json")
 
     def navigate_champs(self):
 
@@ -348,7 +349,7 @@ class Scraper:
                 self.champs_list.append(self.dict_entry)
                 
         #dump to json file
-        self.__dumptojson(self.champs_list, "raw_data/champs_data.json")
+        self.__dumptojson(self.champs_list, "./champs_data.json")
 
     def navigate_circuits(self):
         self.driver.get(self.URL)
@@ -362,7 +363,6 @@ class Scraper:
         
 
         no_of_pages = self.get_no_of_pages(len(info_table)//5, "circuits")
-        print(no_of_pages)
         j = 1
         for i in range(0,int(no_of_pages)*5,6):
                 
@@ -378,7 +378,7 @@ class Scraper:
                 j = j + 1
 
         #dump to json file
-        self.__dumptojson(self.circuit_list, "raw_data/circuit_data.json")
+        self.__dumptojson(self.circuit_list, "./circuit_data.json")
 
     def __create_dir(self,directory: str):
         
@@ -388,7 +388,7 @@ class Scraper:
             directory: name of the file to be created
 
         """
-        parent_dir = "/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data"
+        parent_dir = "."
         path = os.path.join(parent_dir, directory)
         if os.path.exists(path) == False:
             raw_data = os.mkdir(path)
@@ -424,7 +424,7 @@ class Scraper:
                     for file in files:
                         s3.upload_file(os.path.join(root,file),bucketname,file)
 
-        __uploadDirectory("/home/andrew/AICore_work/Data-Collection-Pipeline/raw_data/",BUCKET_NAME)
+        __uploadDirectory("./raw_data/",BUCKET_NAME)
         
     def clean_data(self, data_type : str):
         """Cleans the data using pandas
@@ -438,7 +438,7 @@ class Scraper:
 
         """
         if data_type == 'driver':
-            f = open('raw_data/driver_data.json')
+            f = open('./driver_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
             try:
@@ -534,7 +534,7 @@ class Scraper:
      
 
         if data_type == 'team':
-            f = open('raw_data/teams_data.json')
+            f = open('./teams_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
 
@@ -599,13 +599,11 @@ class Scraper:
             df = df.replace(" ",None)
             df.columns = df.columns.str.lower()
             df.columns = df.columns.str.replace(' ','_')
-            print("when cleaning, type is" )
-            print(type(df))
             return df
             
 
         if data_type =='champs':
-            f = open('raw_data/champs_data.json')
+            f = open('./champs_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
             df.columns = df.columns.str.lower()
@@ -614,7 +612,7 @@ class Scraper:
            
 
         if data_type == 'circuit':
-            f = open('raw_data/circuit_data.json')
+            f = open('./circuit_data.json')
             data = json.load(f)
             df = pd.DataFrame(data)
             df.columns = df.columns.str.lower()
@@ -659,7 +657,6 @@ class Scraper:
             old_data = pd.read_sql_query(sql_statement,con=engine)
             merged_dfs = pd.concat((old_data, data_frame))
             merged_dfs = merged_dfs.drop_duplicates(subset, keep = False)
-            print("records to add..")
             print(merged_dfs)
 
         else:
@@ -683,7 +680,7 @@ class Scraper:
 
 if __name__ == "__main__":
     
-    scraper = Scraper(URL = "https://www.4mula1stats.com/", parent_dir="", headless = True)
+    scraper = Scraper(URL = "https://www.4mula1stats.com/", parent_dir=".", headless = True)
    
     # retrieve all new data
     if scraper.args.drivers:
@@ -708,7 +705,7 @@ if __name__ == "__main__":
     
     
     if scraper.args.circuits:
-        scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", parent_dir="/home/andrew/AICore_work/Data-Collection-Pipeline/utils", headless = True)
+        scraper2 = Scraper("https://www.statsf1.com/en/default.aspx", parent_dir=".", headless = True)
         scraper2.navigate_circuits()
         scraper2.get_circuit_data()
         df = scraper2.clean_data('circuit')

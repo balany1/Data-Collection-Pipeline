@@ -657,8 +657,7 @@ class Scraper:
             old_data = pd.read_sql_query(sql_statement,con=engine)
             merged_dfs = pd.concat((old_data, data_frame))
             merged_dfs = merged_dfs.drop_duplicates(subset, keep = False)
-            print(merged_dfs)
-
+            
         else:
             merged_dfs = data_frame
         

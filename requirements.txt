@@ -1,0 +1,8 @@
+selenium
+webdriver_manager
+pandas
+sqlalchemy
+psycopg2-binary
+boto3
+traitlets
+

@@ -292,6 +292,31 @@ The method that uploads to the database is below and has provision to check for 
         merged_dfs.to_sql(data_table, self.engine, if_exists='replace', index = False)
         self.engine.execute(f'ALTER TABLE "{data_table}" ADD PRIMARY KEY ("{subset}");')
 
+Milestone 8:
 
+In this milestone, I created a dockerfile to be able to run my scraper on another machine. The commands I have used are:
+
+FROM python:3.8
+
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -\
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'\
+    && apt-get -y update\
+    && apt-get install -y google-chrome-stable
+
+COPY . . 
+
+RUN pip install -r requirements.txt
+
+CMD ["python3", "utils/formula1_scrape.py" , "-dtcl"]
+
+Upon running this container I needed to make several small refactors to the code to account for the file structure of the docker container. This meant learning and using relative file paths instead of absolute file paths. Once this happened I have been successfully able to run the scraper remotely on an EC2 instance.
+
+Final Milestone:
+
+At this point, I have set up a github action to build and push a docker image to dockerhub. This required that I set up github secrets for my username and password for Dockerhub to connect. I have learned from this that all of the required files that the docker container needs should also be on github as well as my local system. 
+
+Finally I have used crontab to set the scraper to run and update on a weekly basis and upload to my EC2 instance. I now have a full CI/CD pipeline set up for my scraper.
+
+At this point, I now have a working
 
 

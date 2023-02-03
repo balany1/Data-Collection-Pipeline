@@ -43,13 +43,12 @@ class Scraper:
 
     def __init__(self, URL : str, parent_dir : str, headless: bool = False):
 
+        
         DATABASE_TYPE = 'postgresql'
         DBAPI = 'psycopg2'
-        HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
         USER = 'postgres'
-        PASSWORD = 'T00narmyf1s'
         DATABASE = 'Formula1'
-        PORT = 5432
+        
 
         if headless:
             chrome_options = Options()
@@ -630,11 +629,9 @@ class Scraper:
 
         DATABASE_TYPE = 'postgresql'
         DBAPI = 'psycopg2'
-        HOST = 'formula1.c0ptp1rfwhvx.eu-west-2.rds.amazonaws.com'
         USER = 'postgres'
-        PASSWORD = 'T00narmyf1s'
         DATABASE = 'Formula1'
-        PORT = 5432
+        
 
         #make connection to specified database
         engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
@@ -679,7 +676,12 @@ class Scraper:
                 
 
 if __name__ == "__main__":
-    
+    with open('credentials.json') as cred:
+        credentials = json.load(cred)
+    HOST = credentials['HOST']
+    PASSWORD = credentials['PASSWORD']
+    PORT = credentials['PORT']
+
     scraper = Scraper(URL = "https://www.4mula1stats.com/", parent_dir=".", headless = True)
    
     # retrieve all new data

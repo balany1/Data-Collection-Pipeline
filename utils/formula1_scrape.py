@@ -87,8 +87,8 @@ class Scraper:
             self.__load_and_accept_cookies()
         except NoSuchElementException as NSE:
             logging.error(NSE)
-            pass
-        
+
+
     def __load_and_accept_cookies(self) -> None:
 
         """Opens the site and accepts cookies"""
@@ -140,14 +140,20 @@ class Scraper:
 
     def __find_elements(self, element : str):
 
+        """changes numbers that are type(str) to type(int)
+        Args:
+            element:   piece of data that is in string but should be integer
+          
+        """
+
         column_data = self.driver.find_elements(by=By.XPATH, value= element)
         for i in range(0,len(column_data),2):
-                    entry = self.__edit_multiple_occurrences(column_data[i+1].text)
-                    if entry.isdigit():
-                        entry = int(entry)
-                    else:
-                        entry = entry
-                    self.dict_entry[column_data[i].text] = entry
+            entry = self.__edit_multiple_occurrences(column_data[i+1].text)
+            if entry.isdigit() == True:
+                entry = int(entry)
+            else:
+                entry = entry
+            self.dict_entry[column_data[i].text] = entry
 
     def __get_URL_list(self, element : str , title : str):
 

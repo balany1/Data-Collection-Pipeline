@@ -1,0 +1,165 @@
+2022-10-10 20:10:20,577 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x55d72f2cf2c3 <unknown>
+#1 0x55d72f0d883a <unknown>
+#2 0x55d72f111985 <unknown>
+#3 0x55d72f111b61 <unknown>
+#4 0x55d72f149d14 <unknown>
+#5 0x55d72f12ff6d <unknown>
+#6 0x55d72f147a50 <unknown>
+#7 0x55d72f12fd63 <unknown>
+#8 0x55d72f1047e3 <unknown>
+#9 0x55d72f105a21 <unknown>
+#10 0x55d72f31d18e <unknown>
+#11 0x55d72f320622 <unknown>
+#12 0x55d72f303aae <unknown>
+#13 0x55d72f3212a3 <unknown>
+#14 0x55d72f2f7ecf <unknown>
+#15 0x55d72f341588 <unknown>
+#16 0x55d72f341706 <unknown>
+#17 0x55d72f35b8b2 <unknown>
+#18 0x7f2d72749b43 <unknown>
+
+2022-10-10 20:13:04,923 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x5598a3e522c3 <unknown>
+#1 0x5598a3c5b83a <unknown>
+#2 0x5598a3c94985 <unknown>
+#3 0x5598a3c94b61 <unknown>
+#4 0x5598a3cccd14 <unknown>
+#5 0x5598a3cb2f6d <unknown>
+#6 0x5598a3ccaa50 <unknown>
+#7 0x5598a3cb2d63 <unknown>
+#8 0x5598a3c877e3 <unknown>
+#9 0x5598a3c88a21 <unknown>
+#10 0x5598a3ea018e <unknown>
+#11 0x5598a3ea3622 <unknown>
+#12 0x5598a3e86aae <unknown>
+#13 0x5598a3ea42a3 <unknown>
+#14 0x5598a3e7aecf <unknown>
+#15 0x5598a3ec4588 <unknown>
+#16 0x5598a3ec4706 <unknown>
+#17 0x5598a3ede8b2 <unknown>
+#18 0x7fa89d773b43 <unknown>
+
+2022-10-10 20:17:45,411 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x558769d892c3 <unknown>
+#1 0x558769b9283a <unknown>
+#2 0x558769bcb985 <unknown>
+#3 0x558769bcbb61 <unknown>
+#4 0x558769c03d14 <unknown>
+#5 0x558769be9f6d <unknown>
+#6 0x558769c01a50 <unknown>
+#7 0x558769be9d63 <unknown>
+#8 0x558769bbe7e3 <unknown>
+#9 0x558769bbfa21 <unknown>
+#10 0x558769dd718e <unknown>
+#11 0x558769dda622 <unknown>
+#12 0x558769dbdaae <unknown>
+#13 0x558769ddb2a3 <unknown>
+#14 0x558769db1ecf <unknown>
+#15 0x558769dfb588 <unknown>
+#16 0x558769dfb706 <unknown>
+#17 0x558769e158b2 <unknown>
+#18 0x7f3b4d62fb43 <unknown>
+
+2022-10-10 20:19:49,275 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x558ab3fec2c3 <unknown>
+#1 0x558ab3df583a <unknown>
+#2 0x558ab3e2e985 <unknown>
+#3 0x558ab3e2eb61 <unknown>
+#4 0x558ab3e66d14 <unknown>
+#5 0x558ab3e4cf6d <unknown>
+#6 0x558ab3e64a50 <unknown>
+#7 0x558ab3e4cd63 <unknown>
+#8 0x558ab3e217e3 <unknown>
+#9 0x558ab3e22a21 <unknown>
+#10 0x558ab403a18e <unknown>
+#11 0x558ab403d622 <unknown>
+#12 0x558ab4020aae <unknown>
+#13 0x558ab403e2a3 <unknown>
+#14 0x558ab4014ecf <unknown>
+#15 0x558ab405e588 <unknown>
+#16 0x558ab405e706 <unknown>
+#17 0x558ab40788b2 <unknown>
+#18 0x7ff3efe1db43 <unknown>
+
+2022-10-10 20:21:44,315 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x560a487e82c3 <unknown>
+#1 0x560a485f183a <unknown>
+#2 0x560a4862a985 <unknown>
+#3 0x560a4862ab61 <unknown>
+#4 0x560a48662d14 <unknown>
+#5 0x560a48648f6d <unknown>
+#6 0x560a48660a50 <unknown>
+#7 0x560a48648d63 <unknown>
+#8 0x560a4861d7e3 <unknown>
+#9 0x560a4861ea21 <unknown>
+#10 0x560a4883618e <unknown>
+#11 0x560a48839622 <unknown>
+#12 0x560a4881caae <unknown>
+#13 0x560a4883a2a3 <unknown>
+#14 0x560a48810ecf <unknown>
+#15 0x560a4885a588 <unknown>
+#16 0x560a4885a706 <unknown>
+#17 0x560a488748b2 <unknown>
+#18 0x7f1ccd275b43 <unknown>
+
+2022-10-11 19:34:00,288 - ERROR - 'Best championship position'
+2022-10-11 19:34:05,753 - ERROR - 0
+2022-10-11 19:34:11,726 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x55db61ae12c3 <unknown>
+#1 0x55db618ea83a <unknown>
+#2 0x55db61923985 <unknown>
+#3 0x55db61923b61 <unknown>
+#4 0x55db6195bd14 <unknown>
+#5 0x55db61941f6d <unknown>
+#6 0x55db61959a50 <unknown>
+#7 0x55db61941d63 <unknown>
+#8 0x55db619167e3 <unknown>
+#9 0x55db61917a21 <unknown>
+#10 0x55db61b2f18e <unknown>
+#11 0x55db61b32622 <unknown>
+#12 0x55db61b15aae <unknown>
+#13 0x55db61b332a3 <unknown>
+#14 0x55db61b09ecf <unknown>
+#15 0x55db61b53588 <unknown>
+#16 0x55db61b53706 <unknown>
+#17 0x55db61b6d8b2 <unknown>
+#18 0x7f52c1d96b43 <unknown>
+
+2022-10-13 20:11:50,582 - ERROR - 'Best championship position'
+2022-10-13 20:11:56,509 - ERROR - 0
+2022-10-13 20:12:03,931 - ERROR - Message: no such element: Unable to locate element: {"method":"xpath","selector":"//*[@class='btn btn-success acceptGdpr']"}
+  (Session info: headless chrome=106.0.5249.103)
+Stacktrace:
+#0 0x5597a70e22c3 <unknown>
+#1 0x5597a6eeb83a <unknown>
+#2 0x5597a6f24985 <unknown>
+#3 0x5597a6f24b61 <unknown>
+#4 0x5597a6f5cd14 <unknown>
+#5 0x5597a6f42f6d <unknown>
+#6 0x5597a6f5aa50 <unknown>
+#7 0x5597a6f42d63 <unknown>
+#8 0x5597a6f177e3 <unknown>
+#9 0x5597a6f18a21 <unknown>
+#10 0x5597a713018e <unknown>
+#11 0x5597a7133622 <unknown>
+#12 0x5597a7116aae <unknown>
+#13 0x5597a71342a3 <unknown>
+#14 0x5597a710aecf <unknown>
+#15 0x5597a7154588 <unknown>
+#16 0x5597a7154706 <unknown>
+#17 0x5597a716e8b2 <unknown>
+#18 0x7fd9bdd45b43 <unknown>
+

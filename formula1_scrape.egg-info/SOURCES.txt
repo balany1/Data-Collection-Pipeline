@@ -1,0 +1,12 @@
+README.md
+setup.py
+example/__init__.py
+example/cart.py
+example/product.py
+example/test_cart.py
+example/test_product.py
+formula1_scrape.egg-info/PKG-INFO
+formula1_scrape.egg-info/SOURCES.txt
+formula1_scrape.egg-info/dependency_links.txt
+formula1_scrape.egg-info/requires.txt
+formula1_scrape.egg-info/top_level.txt
